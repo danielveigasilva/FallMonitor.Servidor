@@ -6,63 +6,62 @@ from sklearn.cluster import KMeans
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 
+from flask import Flask, jsonify, request, send_file     
+import html
+import unicodedata
+import os
+import io
+#teste
+import json
+import re
+
+app = Flask(__name__)
+
 
 dataframe = pd.read_csv("DataFrame.csv", sep=';')
-entradasframe = pd.read_csv("Entradas.csv", sep=';')
-
-entradas = np.array(entradasframe.drop('legenda',1))
-entradaslegenda = np.array(entradasframe.legenda)
 
 x = np.array(dataframe.drop('legenda',1))
 y = np.array(dataframe.legenda)
 
-kmeans = KMeans(n_clusters=9, random_state=0)
-kmeans.fit(x)
-kmeansResult = kmeans.predict(entradas)
-finalKmeans = pd.DataFrame({'LegendaOriginal':entradaslegenda,'LegendaKMeans':kmeansResult})
-print ("\n")
-print ("-------------------------------KMeans------------------------------\n")
-print ("\n")
-print(finalKmeans)
-print ("\n")
+def normaliza(dados):
+    return dados
 
-finalKmeans.to_csv('Saidas\KMeans.csv')
+def kmeans(entradas):
+    kmeans = KMeans(n_clusters=9, random_state=0)
+    kmeans.fit(x)
+    return int((kmeans.predict(entradas))[0])
 
+def gaussiannb(entradas):
+    gaussiannb = GaussianNB() 
+    gaussiannb.fit(x, y)
+    return (gaussiannb.predict(entradas))[0]
 
-gaussiannb = GaussianNB() 
-gaussiannb.fit(x, y)
-GaussiannbResult= gaussiannb.predict(entradas)
-finalGaussiannb = pd.DataFrame({'LegendaOriginal':entradaslegenda,'LegendaGaussianNB':GaussiannbResult})
-print ("\n")
-print ("----------------------------Gaussian NB------------------------------\n")
-print ("\n")
-print(finalGaussiannb)
-print ("\n")
+def kNN(entradas):
+    kNN = KNeighborsClassifier(n_neighbors=3)
+    kNN.fit(x,y)
+    return (kNN.predict(entradas))[0]
+    
+def florest(entradas):
+    florest = RandomForestClassifier()
+    florest.fit(x, y)
+    return (florest.predict(entradas))[0]
 
-finalGaussiannb.to_csv('Saidas\Gaussian_NB.csv')
+@app.route('/avaliacao', methods=['POST'])
+def avaliacao():
 
+    dados = request.get_json().get('dados')
+    entrada = np.array([normaliza(dados)])
 
-kNN = KNeighborsClassifier(n_neighbors=3)
-kNN.fit(x,y)
-knnResult = kNN.predict(entradas)
-finalKnn = pd.DataFrame({'LegendaOriginal':entradaslegenda,'LegendaKNN':knnResult})
-print ("\n")
-print ("-------------------------------KNN------------------------------\n")
-print ("\n")
-print(finalKnn)
-print ("\n")
+    return jsonify({
+        "resultado":{
+            "kmeans": kmeans(entrada),
+            "gaussiannb": gaussiannb(entrada),
+            "kNN":kNN(entrada),
+            "florest":florest(entrada)
+         }
+    })
 
-finalKnn.to_csv('Saidas\KNN.csv')
-
-
-florest = RandomForestClassifier()
-florest.fit(x, y)
-florestResult= florest.predict(entradas)
-finalFlorest = pd.DataFrame({'LegendaOriginal':entradaslegenda,'RandomForest':florestResult})
-print ("\n")
-print ("----------------------------RandomForest------------------------------\n")
-print ("\n")
-print(finalFlorest)
-print ("\n")
-
-finalFlorest.to_csv('Saidas\RandomForest.csv')
+if __name__ == "__main__":
+    port = int(os.environ.get('PORT', 5000))
+    #app.run(debug=False, host='0.0.0.0', port=port)
+    app.run(debug=True, host='127.0.0.1', port=port) 
