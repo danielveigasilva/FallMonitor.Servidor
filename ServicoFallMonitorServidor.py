@@ -1,30 +1,48 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.cluster import KMeans
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 
-from flask import Flask, jsonify, request, send_file     
-import html
-import unicodedata
-import os
-import io
-#teste
+from flask import Flask, jsonify, request     
 import json
-import re
+import os
 
 app = Flask(__name__)
 
-
+MAX_SIZE = 196
 dataframe = pd.read_csv("DataFrame.csv", sep=';')
 
 x = np.array(dataframe.drop('legenda',1))
 y = np.array(dataframe.legenda)
 
 def normaliza(dados):
+    Tdados = len(dados)
+
+    if Tdados > MAX_SIZE:
+        return dados[:MAX_SIZE]
+    elif Tdados < MAX_SIZE:
+        ultimosDados = [dados[Tdados - 1], dados[Tdados - 2], dados[Tdados - 3], dados[Tdados - 4]]
+        
+        while len(dados) < MAX_SIZE:
+            dados = dados + ultimosDados
+        
+        return normaliza(dados)
+
     return dados
+
+def queda(_kmeans,GKF_lista):
+    v = 0
+    f = 0
+
+    for result in GKF_lista:    
+        if "nao_queda_" in result:
+            f = f + 1
+        else:
+            v = v + 1
+    
+    return v > f
 
 def kmeans(entradas):
     kmeans = KMeans(n_clusters=9, random_state=0)
@@ -46,18 +64,30 @@ def florest(entradas):
     florest.fit(x, y)
     return (florest.predict(entradas))[0]
 
+@app.route('/atualiza', methods=['POST'])
+def atualiza():
+    return "nao implementado"
+
 @app.route('/avaliacao', methods=['POST'])
 def avaliacao():
 
     dados = request.get_json().get('dados')
     entrada = np.array([normaliza(dados)])
 
+    _kmeans = kmeans(entrada)
+    _gaussiannb = gaussiannb(entrada)
+    _kNN = kNN(entrada)
+    _florest = florest(entrada)
+
+    _queda = queda(_kmeans,[_gaussiannb,_kNN,_florest])
+
     return jsonify({
         "resultado":{
-            "kmeans": kmeans(entrada),
-            "gaussiannb": gaussiannb(entrada),
-            "kNN":kNN(entrada),
-            "florest":florest(entrada)
+            "kmeans":_kmeans,
+            "gaussiannb":_gaussiannb,
+            "kNN":_kNN,
+            "florest":_florest,
+            "queda":_queda
          }
     })
 
